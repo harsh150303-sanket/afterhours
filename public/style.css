@@ -51,3 +51,5 @@
 .host-control-btn{border:1px solid #57456b;border-radius:9px;padding:8px 10px;background:#30253d;color:#e7d5ff;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer}
 .host-control-btn:active{transform:scale(.98)}
 @media(max-width:800px){#chat-app .host-control-btn{font-size:10px;padding:7px 8px}}
+
+.conversation-head .conversation-title{min-width:0;flex:1}.delete-chat-btn{margin-left:auto;flex-shrink:0;border:1px solid #6b3946;background:#33202a;color:#ffd2d9;border-radius:9px;padding:9px 11px;font-size:11px;font-weight:700;cursor:pointer}.delete-chat-btn:disabled{opacity:.45;cursor:not-allowed}@media(max-width:420px){.delete-chat-btn{padding:8px 7px;font-size:10px}}
