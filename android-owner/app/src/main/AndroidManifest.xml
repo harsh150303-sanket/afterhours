@@ -5,8 +5,7 @@
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:label="AfterHours Owner"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar"
-        android:usesCleartextTraffic="false">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
