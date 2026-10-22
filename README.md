@@ -9,13 +9,23 @@ A Node.js + Express + Socket.IO starter for an invite-only, adult roleplay chat 
 - Real-time one-to-one chat with a host-operated persona.
 - Owner console to create/update fictional adult personas and reply as a selected persona.
 - Basic request rate limiting, security headers, message length limits, and `noindex` metadata.
-- Chat history is held **in server memory only** and disappears when the server restarts. It is not a durable database.
+- Optional PostgreSQL-backed chat history. When DATABASE_URL is configured, visitor and host messages (including compressed image data) are saved to PostgreSQL and can be reloaded after a Render restart. Without DATABASE_URL, chat history remains temporary in memory.
 
 ## Important honesty and safety choices
 
 The entry page explicitly tells participants that profiles may be fictional personas operated by one host. Keep this disclosure. Do not present host-operated personas as independent real people. Use only with consenting adults, and do not ask participants to send intimate images or sensitive personal information.
 
 The age field is self-reported, not age verification. For any broader deployment, use an appropriate age-assurance process and legal review. An invite code and `noindex` are not substitutes for access controls.
+
+## Persistent chat history with Neon (free tier)
+
+1. Create a free PostgreSQL project at https://neon.com/ and open its **Connect** panel.
+2. Copy the PostgreSQL connection string. Keep it private; do not put it in source code or commit it to GitHub.
+3. In Render, open the AfterHours web service → **Environment** → add `DATABASE_URL` with that connection string. Keep Neon SSL enabled (the server connects using SSL).
+4. Save the environment variable and redeploy the web service. On startup, the app creates the `chat_messages` table automatically.
+5. Check Render logs for **PostgreSQL chat history storage is ready.** Send a test message, redeploy once, re-enter the invite code if asked, and confirm the conversation still appears.
+
+If the logs say the database is not ready or a message cannot be saved, check the connection string and Render logs. Do not assume persistence is active until the readiness message appears. Neon free-tier limits and policies can change; check its current plan limits. Messages and compressed images consume database storage. Use only for consenting adults and avoid sharing sensitive or intimate images.
 
 ## Run on Windows 11
 
@@ -40,7 +50,7 @@ The age field is self-reported, not age verification. For any broader deployment
 - Keep the repository private if you do not want source code visible. Never commit secrets.
 - Anyone with the invite code can enter, so share it only with intended participants. Rotate it if it leaks.
 - Add persistent storage, moderation/report controls, session expiry, and stronger abuse protection before inviting more people.
-- This starter uses in-memory sessions and messages. A server restart clears them, and the app is not designed for high-availability use.
+- Visitor login sessions are currently held in memory and may need to be re-entered after a Render restart. Chat messages persist only when DATABASE_URL is configured and database initialization succeeds.
 - Do not use this as a public service without security review and appropriate privacy/legal notices.
 
 ## Current limitations
