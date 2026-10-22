@@ -66,15 +66,21 @@ async function saveMessage(message) {
   return true;
 }
 
-async function loadMessages(profileId, limit = 100) {
+async function loadMessages(profileId, limit = 100, sessionId = null) {
   if (!db) return null;
   const ready = await dbReady;
   if (!ready) throw new Error("Database is configured but not ready.");
-  const result = await db.query(
-    `SELECT id, profile_id, session_id, sender_role, sender, message_text, image_data, created_at
-     FROM chat_messages WHERE profile_id = $1 ORDER BY created_at DESC LIMIT $2`,
-    [profileId, limit]
-  );
+  const result = sessionId
+    ? await db.query(
+        `SELECT id, profile_id, session_id, sender_role, sender, message_text, image_data, created_at
+         FROM chat_messages WHERE profile_id = $1 AND session_id = $2 ORDER BY created_at DESC LIMIT $3`,
+        [profileId, sessionId, limit]
+      )
+    : await db.query(
+        `SELECT id, profile_id, session_id, sender_role, sender, message_text, image_data, created_at
+         FROM chat_messages WHERE profile_id = $1 ORDER BY created_at DESC LIMIT $2`,
+        [profileId, limit]
+      );
   return result.rows.reverse().map(row => ({
     id: row.id, profileId: row.profile_id, sessionId: row.session_id,
     from: row.sender_role, sender: row.sender, text: row.message_text,
@@ -1965,6 +1971,23 @@ app.post("/api/enter", (req, res) => {
   res.json({ ok: true, name: session.name, profiles: visibleProfilesFor(session) });
 });
 
+app.delete("/api/chat/:profileId", requireSession, async (req, res) => {
+  const session = req.ahSession, profileId = req.params.profileId;
+  if (!profiles.some(p => p.id === profileId)) return res.status(404).json({ error: "Conversation not found." });
+  try {
+    if (db) {
+      if (!await dbReady) throw new Error("Database is not ready.");
+      await db.query("DELETE FROM chat_messages WHERE session_id = $1 AND profile_id = $2", [session.sid, profileId]);
+    }
+    const room = "chat:" + session.sid + ":" + profileId;
+    rooms.delete(room);
+    io.to(room).emit("history", []);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Could not delete visitor chat:", err.message);
+    res.status(500).json({ error: "Could not delete this chat. Please try again." });
+  }
+});
 app.post("/api/leave", requireSession, (req, res) => {
   sessions.delete(req.ahSession.sid);
   res.clearCookie("ah_session", { path: "/" });
@@ -2064,20 +2087,20 @@ io.on("connection", socket => {
   socket.on("join-profile", async ({ profileId } = {}) => {
     const profile = profiles.find(p => p.id === profileId);
     if (!profile) return socket.emit("chat-error", "That profile is not available.");
-    if (session.activeProfile) socket.leave(session.activeProfile);
+    if (session.activeProfile) socket.leave("chat:" + session.sid + ":" + session.activeProfile);
     session.activeProfile = profileId;
-    socket.join(profileId);
+    const chatRoom = "chat:" + session.sid + ":" + profileId;
+    socket.join(chatRoom);
     if (db) {
       try {
-        const history = await loadMessages(profileId, 100);
-        rooms.set(profileId, history || []);
+        rooms.set(chatRoom, (await loadMessages(profileId, 100, session.sid)) || []);
       } catch (err) {
         console.error("Could not load chat history:", err.message);
         return socket.emit("chat-error", "Chat history could not be loaded. Please try again shortly.");
       }
     }
-    if (!rooms.has(profileId)) rooms.set(profileId, []);
-    socket.emit("history", rooms.get(profileId).slice(-100));
+    if (!rooms.has(chatRoom)) rooms.set(chatRoom, []);
+    socket.emit("history", rooms.get(chatRoom).slice(-100));
     socket.emit("joined-profile", publicProfile(profile));
   });
 
@@ -2099,11 +2122,11 @@ io.on("connection", socket => {
       console.error("Could not save visitor message:", err.message);
       return socket.emit("chat-error", "Message was not saved. Please try sending it again.");
     }
-    if (!rooms.has(profileId)) rooms.set(profileId, []);
-    rooms.get(profileId).push(message);
-    if (rooms.get(profileId).length > 300) rooms.get(profileId).shift();
-    io.to(profileId).emit("message", message);
-    // Owner console receives the visitor message so the owner can reply as a selected persona.
+    const chatRoom = "chat:" + session.sid + ":" + profileId;
+    if (!rooms.has(chatRoom)) rooms.set(chatRoom, []);
+    rooms.get(chatRoom).push(message);
+    if (rooms.get(chatRoom).length > 300) rooms.get(chatRoom).shift();
+    io.to(chatRoom).emit("message", message);
     io.to("owner-console").emit("owner-inbox", message);
     void emailVisitorMessage(message, profile);
   });
@@ -2114,31 +2137,31 @@ io.on("connection", socket => {
     socket.emit("owner-auth-result", { ok: true, profiles: profiles.map(publicProfile) });
   });
 
-  socket.on("owner-join-profile", async ({ profileId, token } = {}) => {
+  socket.on("owner-join-profile", async ({ profileId, sessionId, token } = {}) => {
     if (!safeEqual(token, OWNER_TOKEN)) return;
-    if (!profiles.some(p => p.id === profileId)) return;
-    socket.join("owner:" + profileId);
-    if (db) {
-      try {
-        const history = await loadMessages(profileId, 100);
-        rooms.set(profileId, history || []);
-      } catch (err) {
-        console.error("Could not load owner chat history:", err.message);
-        return socket.emit("chat-error", "Chat history could not be loaded. Please try again shortly.");
-      }
+    if (!profiles.some(p => p.id === profileId) || typeof sessionId !== "string" || !sessionId) return;
+    socket.data.ownerRoom = { profileId, sessionId };
+    try {
+      const room = "chat:" + sessionId + ":" + profileId;
+      const history = db ? await loadMessages(profileId, 100, sessionId) : (rooms.get(room) || []);
+      socket.emit("owner-history", { profileId, sessionId, messages: (history || []).slice(-100) });
+    } catch (err) {
+      console.error("Could not load owner chat history:", err.message);
+      socket.emit("chat-error", "Chat history could not be loaded. Please try again shortly.");
     }
-    socket.emit("owner-history", { profileId, messages: (rooms.get(profileId) || []).slice(-100) });
   });
 
-  socket.on("owner-reply", async ({ profileId, text, image, personaName, token } = {}) => {
+  socket.on("owner-reply", async ({ profileId, sessionId, text, image, personaName, token } = {}) => {
     if (!safeEqual(token, OWNER_TOKEN)) return;
+    if (typeof sessionId !== "string" || !sessionId) return;
+    if (socket.data.ownerRoom?.profileId !== profileId || socket.data.ownerRoom?.sessionId !== sessionId) return;
     const body = typeof text === "string" ? text.trim() : "";
     const safeImage = typeof image === "string" && image.length <= 900_000 &&
       /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image) ? image : "";
     const profile = profiles.find(p => p.id === profileId);
     if (!profile || (!body && !safeImage) || body.length > 2000) return;
     const message = {
-      id: randomId(), from: "persona", sender: profile.name,
+      id: randomId(), from: "persona", sender: profile.name, sessionId,
       profileId, text: body, ...(safeImage ? { image: safeImage } : {}), timestamp: Date.now()
     };
     try {
@@ -2147,10 +2170,11 @@ io.on("connection", socket => {
       console.error("Could not save owner reply:", err.message);
       return socket.emit("chat-error", "Reply was not saved. Please try sending it again.");
     }
-    if (!rooms.has(profileId)) rooms.set(profileId, []);
-    rooms.get(profileId).push(message);
-    if (rooms.get(profileId).length > 300) rooms.get(profileId).shift();
-    io.to(profileId).emit("message", message);
+    const chatRoom = "chat:" + sessionId + ":" + profileId;
+    if (!rooms.has(chatRoom)) rooms.set(chatRoom, []);
+    rooms.get(chatRoom).push(message);
+    if (rooms.get(chatRoom).length > 300) rooms.get(chatRoom).shift();
+    io.to(chatRoom).emit("message", message);
     io.to("owner-console").emit("owner-inbox", message);
   });
 
