@@ -4,3 +4,35 @@
 @media(max-width:800px){.shell{padding:10px 10px calc(10px + env(safe-area-inset-bottom))}.topbar{margin-bottom:22px}.entry-layout{grid-template-columns:1fr;gap:25px;margin-bottom:40px}.intro{padding:10px 0}.intro h1{font-size:43px}.disclosure{margin-top:22px}.chat-layout{grid-template-columns:1fr;min-height:0}.sidebar{padding:14px}.profile-list{flex-direction:row;overflow:auto}.profile-card{min-width:170px}.side-footer{display:none}.chat-layout{height:calc(100dvh - 95px);min-height:0;grid-template-rows:auto minmax(0,1fr);gap:8px;margin-bottom:8px}.sidebar{padding:8px 10px;min-height:0}.side-heading{padding:0 2px 8px}.side-heading h2{font-size:16px}.profile-list{flex-direction:row;overflow-x:auto;overflow-y:hidden;gap:6px;padding-bottom:3px;scrollbar-width:thin}.profile-card{min-width:130px;max-width:160px;padding:7px;gap:7px}.profile-card .avatar{width:32px;height:32px;border-radius:10px;font-size:15px}.profile-card .profile-info strong{font-size:11px}.profile-card .profile-info span{font-size:10px}.conversation{min-height:0;height:100%;max-height:100%;}.conversation-head{padding:10px 12px;gap:9px}.roleplay-note{padding:6px 8px;font-size:9px}.messages{padding:12px;gap:10px;min-height:0;max-height:none;flex:1;overscroll-behavior:contain}.composer{position:sticky;bottom:0;padding:8px;gap:6px;background:var(--panel);padding-bottom:calc(8px + env(safe-area-inset-bottom));}.composer input{padding:11px 10px;font-size:16px}.composer .image-pick{width:38px;height:40px;flex-shrink:0}.send-btn{width:40px;flex-shrink:0}.owner-grid{grid-template-columns:1fr}.owner-header{align-items:flex-start;gap:15px}.owner-header h1{font-size:34px}.footer{flex-wrap:wrap}.entry-form{padding:22px}}@media(max-width:420px){.two-col{gap:8px}.entry-form{padding:18px}.private-pill{font-size:10px}.message{max-width:90%}}
 
 .image-pick{position:relative;display:grid;place-items:center;flex:0 0 42px;width:42px;min-width:42px;height:44px;margin:0!important;border:1px solid #393347;border-radius:12px;background:#211d2c;color:#d7b9ff;font-size:23px;cursor:pointer;overflow:hidden}.image-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}.image-pick:has(input:disabled){opacity:.4;cursor:not-allowed}.chat-image{display:block;max-width:min(100%,340px);max-height:320px;object-fit:contain;border-radius:12px;border:1px solid #453a54;margin:2px 0 5px}.owner-message .chat-image{max-width:100%;max-height:240px}.owner-reply .image-pick{height:44px;flex-shrink:0}.owner-reply input[type=text]{min-width:0}
+
+/* Mobile chat: keep the message composer visible and give messages the remaining screen. */
+@media(max-width:800px){
+  html,body{height:100%;min-height:100%;overflow:hidden}
+  .shell{height:100dvh;min-height:0;display:flex;flex-direction:column;padding:8px 8px env(safe-area-inset-bottom)}
+  .topbar{flex:0 0 42px;height:42px;margin:0 2px 8px}
+  .brand{font-size:17px;gap:7px}.brand-mark{width:30px;height:30px;border-radius:10px}
+  .private-pill{padding:6px 9px}
+  #chat-app.chat-layout{flex:1 1 auto;width:100%;height:auto;min-height:0;max-height:none;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:7px;margin:0;overflow:hidden}
+  #chat-app .sidebar{min-width:0;min-height:0;padding:7px 8px;border-radius:14px}
+  #chat-app .side-heading{padding:0 2px 6px}
+  #chat-app .side-heading .eyebrow{font-size:8px;letter-spacing:1.4px;margin-bottom:2px}
+  #chat-app .side-heading h2{font-size:14px}
+  #chat-app .icon-btn{width:30px;height:30px}
+  #chat-app .profile-list{width:100%;min-width:0;display:flex;flex-direction:row;gap:6px;overflow-x:auto;overflow-y:hidden;padding:0 0 3px;scroll-snap-type:x proximity}
+  #chat-app .profile-card{flex:0 0 142px;min-width:0;max-width:142px;padding:6px;gap:6px;scroll-snap-align:start}
+  #chat-app .profile-card .avatar{width:29px;height:29px;flex:0 0 29px;border-radius:9px;font-size:13px}
+  #chat-app .profile-card .profile-info strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #chat-app .profile-card .profile-info span{font-size:9px}
+  #chat-app .conversation{min-height:0;height:100%;max-height:none;overflow:hidden;border-radius:14px}
+  #chat-app .conversation-head{flex:0 0 auto;padding:9px 10px;gap:8px}
+  #chat-app .conversation-head .avatar{width:32px;height:32px;flex:0 0 32px;border-radius:10px;font-size:15px}
+  #chat-app .conversation-head h2{font-size:14px}
+  #chat-app .conversation-head p{font-size:10px;margin-top:3px}
+  #chat-app .roleplay-note{flex:0 0 auto;padding:5px 7px;font-size:9px}
+  #chat-app .messages{flex:1 1 auto;min-height:0;max-height:none;padding:10px;overflow-y:auto;overscroll-behavior:contain}
+  #chat-app .composer{flex:0 0 auto;position:relative;bottom:auto;display:flex;align-items:center;gap:6px;padding:7px;background:var(--panel);padding-bottom:calc(7px + env(safe-area-inset-bottom))}
+  #chat-app .composer input{width:0;flex:1 1 auto;min-width:0;padding:10px 9px;font-size:16px}
+  #chat-app .composer .image-pick{flex:0 0 36px;width:36px;min-width:36px;height:40px}
+  #chat-app .composer .send-btn{flex:0 0 40px;width:40px;height:40px}
+  .shell:has(#chat-app:not(.hidden)) .footer{display:none}
+}
