@@ -201,8 +201,10 @@ $("leave").addEventListener("click", async () => {
   await fetch("/api/leave",{method:"POST"});
   activeProfile=null; $("message-input").disabled=true; show("entry");
 });
+function openHostControl() { show("owner-app"); }
+$("open-host-control").addEventListener("click", openHostControl);
 document.querySelector(".footer a").addEventListener("click", e => {
-  e.preventDefault(); show("owner-app");
+  e.preventDefault(); openHostControl();
 });
 $("back-to-chat").addEventListener("click", () => show("chat-app"));
 function sendOwnerAuth() {
