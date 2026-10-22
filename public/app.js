@@ -7,11 +7,35 @@ let ownerToken = "";
 let ownerConnected = false;
 let ownerRoom = "";
 let ownerMessages = new Map();
+let ownerAuthPending = false;
+let ownerAuthTimer = null;
+const notifiedChats = new Set();
 
 function show(id) { ["entry","chat-app","owner-app"].forEach(x => $(x).classList.toggle("hidden", x !== id)); }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function time(ts) { return new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); }
 function profileById(id) { return profiles.find(p => p.id === id); }
+
+function notifyOwnerOfVisitorMessage(m) {
+  if (!ownerConnected || !m || m.from !== "visitor" || !("Notification" in window) || Notification.permission !== "granted") return;
+  const chatKey = String(m.sessionId || m.sender || "visitor") + ":" + m.profileId;
+  if (notifiedChats.has(chatKey)) return;
+  notifiedChats.add(chatKey);
+  const profile = profileById(m.profileId);
+  try {
+    const notice = new Notification("AfterHours · New chat started", {
+      body: (m.sender || "A visitor") + " started chatting with " + (profile ? profile.name : "a persona") + ".",
+      tag: "afterhours-" + chatKey
+    });
+    notice.onclick = () => {
+      window.focus();
+      show("owner-app");
+      $("owner-room").value = m.profileId;
+      $("owner-room").dispatchEvent(new Event("change"));
+      notice.close();
+    };
+  } catch (_) {}
+}
 
 $("entry-form").addEventListener("submit", async e => {
   e.preventDefault(); $("entry-error").textContent = "";
@@ -61,6 +85,7 @@ function renderOwnerMessages() {
   $("owner-messages").scrollTop = $("owner-messages").scrollHeight;
 }
 function storeOwnerMessage(m) {
+  notifyOwnerOfVisitorMessage(m);
   if (!ownerMessages.has(m.profileId)) ownerMessages.set(m.profileId, []);
   const arr = ownerMessages.get(m.profileId);
   if (!arr.some(x => x.id === m.id)) arr.push(m);
@@ -76,7 +101,16 @@ function renderOwnerProfiles() {
     renderProfiles(); renderOwnerProfiles();
   }));
 }
-socket.on("connect_error", err => { $("entry-error").textContent = err.message || "Connection failed."; });
+socket.on("connect_error", err => {
+  const message = err.message || "Connection failed.";
+  $("entry-error").textContent = message;
+  if (!$("owner-app").classList.contains("hidden")) {
+    ownerConnected = false;
+    ownerAuthPending = false;
+    if (ownerAuthTimer) clearTimeout(ownerAuthTimer);
+    $("owner-status").textContent = "Chat server connection failed: " + message;
+  }
+});
 socket.on("profiles", list => { profiles = list; renderProfiles(); });
 socket.on("profiles-updated", list => { profiles = list; renderProfiles(); renderOwnerProfiles(); });
 socket.on("history", list => { $("messages").innerHTML = ""; list.forEach(addMessage); if (!list.length) $("messages").innerHTML = '<div class="empty-state"><div class="empty-symbol">✧</div><h3>Say hello.</h3><p>Your messages will appear here.</p></div>'; });
@@ -102,15 +136,48 @@ document.querySelector(".footer a").addEventListener("click", e => {
   e.preventDefault(); show("owner-app");
 });
 $("back-to-chat").addEventListener("click", () => show("chat-app"));
+function sendOwnerAuth() {
+  if (!ownerAuthPending || !socket.connected) return;
+  ownerAuthPending = false;
+  socket.emit("owner-auth", {token:ownerToken});
+  if (ownerAuthTimer) clearTimeout(ownerAuthTimer);
+  ownerAuthTimer = setTimeout(() => {
+    if (!ownerConnected) $("owner-status").textContent = "No response from the server. Refresh the page and check the Render logs.";
+  }, 8000);
+}
 $("owner-connect").addEventListener("click", () => {
   ownerToken = $("owner-token").value;
   if (!ownerToken) { $("owner-status").textContent = "Enter the owner token."; return; }
-  socket.emit("owner-auth", {token:ownerToken});
-  $("owner-status").textContent = "Checking owner token…";
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
+  ownerConnected = false;
+  ownerAuthPending = true;
+  $("owner-status").textContent = "Connecting to server…";
+  if (!socket.connected) {
+    socket.connect();
+    if (ownerAuthTimer) clearTimeout(ownerAuthTimer);
+    ownerAuthTimer = setTimeout(() => {
+      if (ownerAuthPending) {
+        ownerAuthPending = false;
+        $("owner-status").textContent = "Chat server is not connected. Refresh and try again.";
+      }
+    }, 8000);
+  } else {
+    sendOwnerAuth();
+  }
+});
+socket.on("connect", sendOwnerAuth);
+socket.on("disconnect", () => {
+  if (ownerConnected) $("owner-status").textContent = "Disconnected. Reconnect to receive chat notifications.";
+  ownerConnected = false;
 });
 socket.on("owner-auth-result", result => {
+  if (ownerAuthTimer) clearTimeout(ownerAuthTimer);
   ownerConnected = result.ok;
-  $("owner-status").textContent = result.ok ? "Owner console connected." : "Owner token was rejected.";
+  $("owner-status").textContent = result.ok
+    ? ("Owner console connected." + (("Notification" in window && Notification.permission === "granted") ? " Chat notifications are enabled." : " Allow browser notifications to receive alerts."))
+    : "Owner token was rejected. Check OWNER_TOKEN in Render.";
   if (result.ok) { profiles = result.profiles; renderOwnerProfiles(); renderProfiles(); }
 });
 $("owner-room").addEventListener("change", () => {
