@@ -59,6 +59,20 @@ async function restoreVisitorSession() {
   } catch (_) {}
 }
 
+async function restoreVisitorSession() {
+  try {
+    const r = await fetch("/api/session", { credentials: "same-origin" });
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!data.ok) return;
+    myName = data.name;
+    profiles = data.profiles || [];
+    show("chat-app");
+    renderProfiles();
+    socket.connect();
+  } catch (_) {}
+}
+
 $("entry-form").addEventListener("submit", async e => {
   e.preventDefault(); $("entry-error").textContent = "";
   const payload = {
@@ -271,6 +285,9 @@ $("persona-form").addEventListener("submit", async e => {
   const d = await r.json(); if(!r.ok) return $("owner-status").textContent = d.error || "Could not save persona.";
   profiles = d.profiles; renderProfiles(); renderOwnerProfiles(); $("persona-form").reset(); $("persona-age").value=28; $("persona-color").value="#d9b8ff";
 });
+
+
+restoreVisitorSession();
 
 
 restoreVisitorSession();
