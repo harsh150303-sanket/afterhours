@@ -20,6 +20,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import android.view.View;
 
 public class MainActivity extends Activity {
     private static final String SITE = "https://afterhours-gqex.onrender.com/";
@@ -39,6 +40,11 @@ public class MainActivity extends Activity {
         }
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(createWebView(), false);
+        webView.setVerticalScrollBarEnabled(true);
+        webView.setHorizontalScrollBarEnabled(false);
+        webView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        webView.setFocusable(true);
+        webView.setFocusableInTouchMode(true);
         setContentView(webView);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -48,6 +54,10 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(true);
         webView.addJavascriptInterface(new NativeBridge(), "AfterHoursNative");
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                view.evaluateJavascript("(function(){document.documentElement.style.setProperty('touch-action','pan-y');document.body.style.setProperty('touch-action','pan-y');document.documentElement.style.setProperty('overscroll-behavior-y','auto');document.body.style.setProperty('overscroll-behavior-y','auto');})();", null);
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 return !SITE.startsWith(uri.getScheme() + "://" + uri.getHost());
