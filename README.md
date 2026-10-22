@@ -49,3 +49,15 @@ The age field is self-reported, not age verification. For any broader deployment
 - Messages are relayed to the matching profile room. The owner inbox receives visitor messages and owner replies.
 - The app has no durable database, image/file uploads, email, password login, or third-party identity verification.
 - The invitation code controls entry but does not uniquely identify a participant; a no-login system cannot reliably prevent nickname reuse.
+
+
+## Email alerts for incoming messages
+
+The server can send an email to `NOTIFY_EMAIL` for every visitor message. It uses Resend's email API (Node 20+ built-in `fetch`; no extra package required).
+
+Set these in Render → your service → Environment:
+- `RESEND_API_KEY`: an API key created in your Resend account. Keep it secret.
+- `NOTIFY_EMAIL`: `harshtaily153@gmail.com` (default in code).
+- `EMAIL_FROM`: a sender address permitted by Resend. The default `AfterHours <onboarding@resend.dev>` is for Resend's testing restrictions; for reliable delivery, verify a domain in Resend and set a sender address on that domain.
+
+Email delivery is disabled until `RESEND_API_KEY` is set. After saving variables, redeploy and test by sending a message to a persona. Check Render logs and the mailbox's Spam folder if no email arrives. Notifications include the visitor display name, persona, message text, and timestamp, so treat them as private.
