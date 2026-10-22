@@ -303,6 +303,13 @@ socket.on("owner-history", ({profileId,sessionId,messages}) => {
   if(ownerRoom===key) renderOwnerMessages();
 });
 socket.on("owner-inbox", storeOwnerMessage);
+socket.on("owner-conversations", list => {
+  for (const c of (Array.isArray(list) ? list : [])) {
+    const key = conversationKey(c.sessionId,c.profileId);
+    ownerConversations.set(key,c);
+  }
+  renderOwnerConversationOptions();
+});
 $("owner-reply-form").addEventListener("submit", async e => {
   e.preventDefault();
   const text = $("owner-reply-input").value.trim();
