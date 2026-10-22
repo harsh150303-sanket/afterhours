@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>AfterHours — Private Chat</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="ambient"></div>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark">✦</span><span>AfterHours</span></a>
+      <span class="private-pill"><i></i> Invite-only</span>
+    </header>
+
+    <section id="entry" class="entry-layout">
+      <div class="intro">
+        <p class="eyebrow">A PRIVATE SPACE FOR ADULTS</p>
+        <h1>Good conversations<br><em>happen after hours.</em></h1>
+        <p class="intro-copy">A quiet, invite-only place for one-to-one conversations and consensual roleplay.</p>
+        <div class="disclosure"><span>ⓘ</span><p><strong>How this space works</strong><br>This is a host-operated roleplay experience. Profiles may be fictional characters managed by one host, not independent people. Continue only if you are comfortable with that.</p></div>
+      </div>
+      <form id="entry-form" class="panel entry-form">
+        <div class="panel-heading"><h2>Step inside</h2><p>No account needed. Use a nickname.</p></div>
+        <label>Private invite code<input id="invite" type="password" autocomplete="off" placeholder="Enter your invite code" required></label>
+        <label>Display name<input id="display-name" maxlength="32" placeholder="What should we call you?" required></label>
+        <div class="two-col">
+          <label>Age <span class="subtle">(18+)</span><input id="age" type="number" min="18" max="120" value="25" required></label>
+          <label>Gender<select id="gender"><option>Woman</option><option>Man</option><option>Non-binary</option><option>Prefer not to say</option></select></label>
+        </div>
+        <label>Interested in chatting with<select id="preference"><option>Men</option><option>Women</option><option>Everyone</option></select></label>
+        <label class="check-row"><input id="consent" type="checkbox" required><span>I am 18 or older, and I understand that profiles may be operated by one host for roleplay.</span></label>
+        <button class="primary-btn" type="submit">Enter private chat <span>↗</span></button>
+        <p id="entry-error" class="error" role="alert"></p>
+        <p class="tiny-note">Don't use your legal name or share sensitive personal information.</p>
+      </form>
+    </section>
+
+    <section id="chat-app" class="chat-layout hidden">
+      <aside class="sidebar panel">
+        <div class="side-heading"><div><p class="eyebrow">YOUR SPACE</p><h2>Conversations</h2></div><button id="leave" class="icon-btn" title="Leave chat">↪</button></div>
+        <div id="profile-list" class="profile-list"></div>
+        <div class="side-footer"><span class="status-dot"></span><span>Private session</span></div>
+      </aside>
+      <section class="conversation panel">
+        <header id="conversation-head" class="conversation-head">
+          <div class="avatar">✦</div><div><h2>Choose a profile</h2><p>Start a conversation when you're ready.</p></div>
+        </header>
+        <div id="messages" class="messages"><div class="empty-state"><div class="empty-symbol">✧</div><h3>Your next conversation starts here.</h3><p>Choose a profile on the left to begin.</p></div></div>
+        <form id="message-form" class="composer">
+          <input id="message-input" maxlength="2000" placeholder="Write a message…" autocomplete="off" disabled>
+          <button class="send-btn" type="submit" disabled aria-label="Send message">➤</button>
+        </form>
+      </section>
+    </section>
+
+    <section id="owner-app" class="owner-layout hidden">
+      <div class="owner-header"><div><p class="eyebrow">HOST CONTROL</p><h1>Persona desk</h1><p>Manage fictional profiles and reply to conversations.</p></div><button id="back-to-chat" class="secondary-btn">Back to chat</button></div>
+      <div class="owner-grid">
+        <section class="panel owner-panel"><h2>Owner access</h2><label>Owner token<input id="owner-token" type="password" placeholder="Your OWNER_TOKEN"></label><button id="owner-connect" class="primary-btn">Connect owner console</button><p id="owner-status" class="error"></p><hr><h2>Create / update persona</h2>
+          <form id="persona-form">
+            <label>Profile ID<input id="persona-id" placeholder="e.g. alex" pattern="[A-Za-z0-9_-]{2,24}" required></label>
+            <label>Display name<input id="persona-name" maxlength="32" required></label>
+            <div class="two-col"><label>Age (18+)<input id="persona-age" type="number" min="18" value="28" required></label><label>Gender<select id="persona-gender"><option>Man</option><option>Woman</option><option>Non-binary</option></select></label></div><label>Accent colour<input id="persona-color" type="color" value="#d9b8ff"></label>
+            <label>Short bio<input id="persona-bio" maxlength="160" placeholder="A short fictional character description"></label>
+            <button class="primary-btn" type="submit">Save persona</button>
+          </form>
+          <div id="owner-profiles" class="owner-profiles"></div>
+        </section>
+        <section class="panel owner-panel"><h2>Inbox</h2><p class="muted">Choose a profile to review its recent messages and reply as that roleplay character.</p><label>Conversation<select id="owner-room"><option value="">Choose a persona…</option></select></label><div id="owner-messages" class="owner-messages"><p class="muted">Connect, then choose a conversation.</p></div>
+          <form id="owner-reply-form" class="owner-reply"><input id="owner-reply-input" maxlength="2000" placeholder="Reply as selected persona…" disabled><button class="send-btn" disabled>➤</button></form>
+        </section>
+      </div>
+    </section>
+    <footer class="footer"><span>AfterHours · private roleplay</span><a href="/owner.html">Host console</a><span>18+ only</span></footer>
+  </main>
+  <script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
+</body>
+</html>
