@@ -2099,12 +2099,6 @@ io.on("connection", socket => {
       console.error("Could not save visitor message:", err.message);
       return socket.emit("chat-error", "Message was not saved. Please try sending it again.");
     }
-    try {
-      await saveMessage(message);
-    } catch (err) {
-      console.error("Could not save owner reply:", err.message);
-      return socket.emit("chat-error", "Reply was not saved. Please try sending it again.");
-    }
     if (!rooms.has(profileId)) rooms.set(profileId, []);
     rooms.get(profileId).push(message);
     if (rooms.get(profileId).length > 300) rooms.get(profileId).shift();
@@ -2147,6 +2141,12 @@ io.on("connection", socket => {
       id: randomId(), from: "persona", sender: profile.name,
       profileId, text: body, ...(safeImage ? { image: safeImage } : {}), timestamp: Date.now()
     };
+    try {
+      await saveMessage(message);
+    } catch (err) {
+      console.error("Could not save owner reply:", err.message);
+      return socket.emit("chat-error", "Reply was not saved. Please try sending it again.");
+    }
     if (!rooms.has(profileId)) rooms.set(profileId, []);
     rooms.get(profileId).push(message);
     if (rooms.get(profileId).length > 300) rooms.get(profileId).shift();
