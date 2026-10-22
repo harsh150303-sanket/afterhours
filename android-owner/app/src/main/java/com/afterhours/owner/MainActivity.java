@@ -22,7 +22,7 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
-    private static final String SITE = "https://afterhours-qgex.onrender.com/";
+    private static final String SITE = "https://afterhours-gqex.onrender.com/";
     private static final String CHANNEL_ID = "afterhours_owner_messages";
     private WebView webView;
     private ValueCallback<Uri[]> fileChooserCallback;
