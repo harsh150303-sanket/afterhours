@@ -49,6 +49,7 @@
         </header>
         <div id="messages" class="messages"><div class="empty-state"><div class="empty-symbol">✧</div><h3>Your next conversation starts here.</h3><p>Choose a profile on the left to begin.</p></div></div>
         <form id="message-form" class="composer">
+          <label class="image-pick" title="Attach an image" aria-label="Attach an image">＋<input id="visitor-image" type="file" accept="image/*" disabled></label>
           <input id="message-input" maxlength="2000" placeholder="Write a message…" autocomplete="off" disabled>
           <button class="send-btn" type="submit" disabled aria-label="Send message">➤</button>
         </form>
@@ -69,7 +70,7 @@
           <div id="owner-profiles" class="owner-profiles"></div>
         </section>
         <section class="panel owner-panel"><h2>Inbox</h2><p class="muted">Choose a profile to review its recent messages and reply as that roleplay character.</p><label>Conversation<select id="owner-room"><option value="">Choose a persona…</option></select></label><div id="owner-messages" class="owner-messages"><p class="muted">Connect, then choose a conversation.</p></div>
-          <form id="owner-reply-form" class="owner-reply"><input id="owner-reply-input" maxlength="2000" placeholder="Reply as selected persona…" disabled><button class="send-btn" disabled>➤</button></form>
+          <form id="owner-reply-form" class="owner-reply"><label class="image-pick" title="Attach an image" aria-label="Attach an image">＋<input id="owner-image" type="file" accept="image/*" disabled></label><input id="owner-reply-input" maxlength="2000" placeholder="Reply as selected persona…" disabled><button class="send-btn" type="submit" disabled>➤</button></form>
         </section>
       </div>
     </section>
