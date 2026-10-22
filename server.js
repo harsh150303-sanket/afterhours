@@ -6,6 +6,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
+const { Pool } = require("pg");
 
 const app = express();
 const server = http.createServer(app);
@@ -18,6 +19,69 @@ const isProd = process.env.NODE_ENV === "production";
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || "harshtaily153@gmail.com";
 const EMAIL_FROM = process.env.EMAIL_FROM || "AfterHours <onboarding@resend.dev>";
+const DATABASE_URL = process.env.DATABASE_URL || "";
+const db = DATABASE_URL ? new Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 3,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000
+}) : null;
+let dbReady = Promise.resolve(false);
+if (db) {
+  dbReady = db.query(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      profile_id TEXT NOT NULL,
+      session_id TEXT,
+      sender_role TEXT NOT NULL,
+      sender TEXT NOT NULL,
+      message_text TEXT NOT NULL DEFAULT '',
+      image_data TEXT,
+      created_at BIGINT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS chat_messages_profile_created_idx
+      ON chat_messages (profile_id, created_at);
+  `).then(() => {
+    console.log("PostgreSQL chat history storage is ready.");
+    return true;
+  }).catch(err => {
+    console.error("PostgreSQL initialization failed:", err.message);
+    return false;
+  });
+} else {
+  console.warn("DATABASE_URL is not set. Chat history will be temporary and lost on restart.");
+}
+
+async function saveMessage(message) {
+  if (!db) return false;
+  const ready = await dbReady;
+  if (!ready) throw new Error("Database is configured but not ready.");
+  await db.query(
+    `INSERT INTO chat_messages (id, profile_id, session_id, sender_role, sender, message_text, image_data, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     ON CONFLICT (id) DO NOTHING`,
+    [message.id, message.profileId, message.sessionId || null, message.from, message.sender, message.text || "", message.image || null, message.timestamp]
+  );
+  return true;
+}
+
+async function loadMessages(profileId, limit = 100) {
+  if (!db) return null;
+  const ready = await dbReady;
+  if (!ready) throw new Error("Database is configured but not ready.");
+  const result = await db.query(
+    `SELECT id, profile_id, session_id, sender_role, sender, message_text, image_data, created_at
+     FROM chat_messages WHERE profile_id = $1 ORDER BY created_at DESC LIMIT $2`,
+    [profileId, limit]
+  );
+  return result.rows.reverse().map(row => ({
+    id: row.id, profileId: row.profile_id, sessionId: row.session_id,
+    from: row.sender_role, sender: row.sender, text: row.message_text,
+    ...(row.image_data ? { image: row.image_data } : {}),
+    timestamp: Number(row.created_at)
+  }));
+}
 
 async function emailVisitorMessage(message, profile) {
   if (!RESEND_API_KEY) return;
@@ -1997,18 +2061,27 @@ io.on("connection", socket => {
   socket.join("session:" + session.sid);
   socket.emit("profiles", visibleProfilesFor(session));
 
-  socket.on("join-profile", ({ profileId } = {}) => {
+  socket.on("join-profile", async ({ profileId } = {}) => {
     const profile = profiles.find(p => p.id === profileId);
     if (!profile) return socket.emit("chat-error", "That profile is not available.");
     if (session.activeProfile) socket.leave(session.activeProfile);
     session.activeProfile = profileId;
     socket.join(profileId);
+    if (db) {
+      try {
+        const history = await loadMessages(profileId, 100);
+        rooms.set(profileId, history || []);
+      } catch (err) {
+        console.error("Could not load chat history:", err.message);
+        return socket.emit("chat-error", "Chat history could not be loaded. Please try again shortly.");
+      }
+    }
     if (!rooms.has(profileId)) rooms.set(profileId, []);
     socket.emit("history", rooms.get(profileId).slice(-100));
     socket.emit("joined-profile", publicProfile(profile));
   });
 
-  socket.on("send-message", ({ profileId, text, image } = {}) => {
+  socket.on("send-message", async ({ profileId, text, image } = {}) => {
     const body = typeof text === "string" ? text.trim() : "";
     const safeImage = typeof image === "string" && image.length <= 900_000 &&
       /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image) ? image : "";
@@ -2020,6 +2093,18 @@ io.on("connection", socket => {
       id: randomId(), from: "visitor", sender: session.name, sessionId: session.sid,
       profileId, text: body, ...(safeImage ? { image: safeImage } : {}), timestamp: Date.now()
     };
+    try {
+      await saveMessage(message);
+    } catch (err) {
+      console.error("Could not save visitor message:", err.message);
+      return socket.emit("chat-error", "Message was not saved. Please try sending it again.");
+    }
+    try {
+      await saveMessage(message);
+    } catch (err) {
+      console.error("Could not save owner reply:", err.message);
+      return socket.emit("chat-error", "Reply was not saved. Please try sending it again.");
+    }
     if (!rooms.has(profileId)) rooms.set(profileId, []);
     rooms.get(profileId).push(message);
     if (rooms.get(profileId).length > 300) rooms.get(profileId).shift();
@@ -2035,14 +2120,23 @@ io.on("connection", socket => {
     socket.emit("owner-auth-result", { ok: true, profiles: profiles.map(publicProfile) });
   });
 
-  socket.on("owner-join-profile", ({ profileId, token } = {}) => {
+  socket.on("owner-join-profile", async ({ profileId, token } = {}) => {
     if (!safeEqual(token, OWNER_TOKEN)) return;
     if (!profiles.some(p => p.id === profileId)) return;
     socket.join("owner:" + profileId);
+    if (db) {
+      try {
+        const history = await loadMessages(profileId, 100);
+        rooms.set(profileId, history || []);
+      } catch (err) {
+        console.error("Could not load owner chat history:", err.message);
+        return socket.emit("chat-error", "Chat history could not be loaded. Please try again shortly.");
+      }
+    }
     socket.emit("owner-history", { profileId, messages: (rooms.get(profileId) || []).slice(-100) });
   });
 
-  socket.on("owner-reply", ({ profileId, text, image, personaName, token } = {}) => {
+  socket.on("owner-reply", async ({ profileId, text, image, personaName, token } = {}) => {
     if (!safeEqual(token, OWNER_TOKEN)) return;
     const body = typeof text === "string" ? text.trim() : "";
     const safeImage = typeof image === "string" && image.length <= 900_000 &&
