@@ -17,14 +17,22 @@ function time(ts) { return new Date(ts).toLocaleTimeString([], {hour:"2-digit",m
 function profileById(id) { return profiles.find(p => p.id === id); }
 
 function notifyOwnerOfVisitorMessage(m) {
-  if (!ownerConnected || !m || m.from !== "visitor" || !("Notification" in window) || Notification.permission !== "granted") return;
+  if (!ownerConnected || !m || m.from !== "visitor") return;
   const chatKey = String(m.sessionId || m.sender || "visitor") + ":" + m.profileId;
   if (notifiedChats.has(chatKey)) return;
   notifiedChats.add(chatKey);
   const profile = profileById(m.profileId);
+  const title = "AfterHours · New message";
+  const body = (m.sender || "A visitor") + " messaged " + (profile ? profile.name : "a persona") + ".";
   try {
-    const notice = new Notification("AfterHours · New chat started", {
-      body: (m.sender || "A visitor") + " started chatting with " + (profile ? profile.name : "a persona") + ".",
+    if (window.AfterHoursNative && typeof window.AfterHoursNative.notify === "function") {
+      window.AfterHoursNative.notify(title, body, String(m.profileId));
+    }
+  } catch (_) {}
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const notice = new Notification(title, {
+      body,
       tag: "afterhours-" + chatKey
     });
     notice.onclick = () => {
