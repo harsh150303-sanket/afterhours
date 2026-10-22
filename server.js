@@ -1864,6 +1864,12 @@ function visibleProfilesFor(session) {
   }).map(publicProfile);
 }
 
+app.get("/api/session", (req, res) => {
+  const session = sessionFromCookie(req);
+  if (!session) return res.status(401).json({ ok: false });
+  res.json({ ok: true, name: session.name, profiles: visibleProfilesFor(session) });
+});
+
 app.post("/api/enter", (req, res) => {
   const { inviteCode, name, age, gender, preference, consent } = req.body || {};
   if (!safeEqual(inviteCode, INVITE_CODE)) return res.status(403).json({ error: "That invite code is not valid." });
