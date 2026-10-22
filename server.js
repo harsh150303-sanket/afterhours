@@ -1972,7 +1972,7 @@ io.on("connection", socket => {
     const profile = profiles.find(p => p.id === profileId);
     if (!profile) return;
     const message = {
-      id: randomId(), from: "visitor", sender: session.name,
+      id: randomId(), from: "visitor", sender: session.name, sessionId: session.sid,
       profileId, text: body, timestamp: Date.now()
     };
     if (!rooms.has(profileId)) rooms.set(profileId, []);
