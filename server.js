@@ -15,6 +15,43 @@ const PORT = Number(process.env.PORT || 3000);
 const INVITE_CODE = process.env.INVITE_CODE || "";
 const OWNER_TOKEN = process.env.OWNER_TOKEN || "";
 const isProd = process.env.NODE_ENV === "production";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || "harshtaily153@gmail.com";
+const EMAIL_FROM = process.env.EMAIL_FROM || "AfterHours <onboarding@resend.dev>";
+
+async function emailVisitorMessage(message, profile) {
+  if (!RESEND_API_KEY) return;
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + RESEND_API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: [NOTIFY_EMAIL],
+        subject: "AfterHours: new message for " + profile.name,
+        text: [
+          "A visitor sent a message on AfterHours.",
+          "",
+          "Visitor display name: " + message.sender,
+          "Persona: " + profile.name + " (" + profile.id + ")",
+          "Message: " + message.text,
+          "Time: " + new Date(message.timestamp).toISOString(),
+          "",
+          "Note: this notification contains chat content. Keep it private."
+        ].join("\n")
+      })
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      console.error("Email notification failed:", response.status, detail.slice(0, 300));
+    }
+  } catch (err) {
+    console.error("Email notification error:", err.message);
+  }
+}
 
 if (!INVITE_CODE || !OWNER_TOKEN) {
   console.warn("WARNING: Set INVITE_CODE and OWNER_TOKEN in your environment before using this app.");
@@ -1981,6 +2018,7 @@ io.on("connection", socket => {
     io.to(profileId).emit("message", message);
     // Owner console receives the visitor message so the owner can reply as a selected persona.
     io.to("owner-console").emit("owner-inbox", message);
+    void emailVisitorMessage(message, profile);
   });
 
   socket.on("owner-auth", ({ token } = {}) => {
