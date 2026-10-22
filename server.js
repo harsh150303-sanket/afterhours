@@ -2131,10 +2131,26 @@ io.on("connection", socket => {
     void emailVisitorMessage(message, profile);
   });
 
-  socket.on("owner-auth", ({ token } = {}) => {
+  socket.on("owner-auth", async ({ token } = {}) => {
     if (!safeEqual(token, OWNER_TOKEN)) return socket.emit("owner-auth-result", { ok: false });
     socket.join("owner-console");
     socket.emit("owner-auth-result", { ok: true, profiles: profiles.map(publicProfile) });
+    if (db) {
+      try {
+        if (!await dbReady) throw new Error("Database is not ready.");
+        const result = await db.query(
+          `SELECT DISTINCT ON (session_id, profile_id) session_id, profile_id, sender, created_at
+           FROM chat_messages WHERE session_id IS NOT NULL
+           ORDER BY session_id, profile_id, created_at DESC`
+        );
+        socket.emit("owner-conversations", result.rows.map(row => ({
+          sessionId: row.session_id, profileId: row.profile_id,
+          sender: row.sender, timestamp: Number(row.created_at)
+        })));
+      } catch (err) {
+        console.error("Could not list owner conversations:", err.message);
+      }
+    }
   });
 
   socket.on("owner-join-profile", async ({ profileId, sessionId, token } = {}) => {
