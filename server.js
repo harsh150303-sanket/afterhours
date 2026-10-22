@@ -1889,7 +1889,7 @@ app.post("/api/enter", (req, res) => {
   };
   sessions.set(sid, session);
   res.cookie("ah_session", sid, {
-    httpOnly: true, sameSite: "strict", secure: isProd, maxAge: 12 * 60 * 60 * 1000,
+    httpOnly: true, sameSite: "strict", secure: isProd, maxAge: 30 * 24 * 60 * 60 * 1000,
     path: "/"
   });
   res.json({ ok: true, name: session.name, profiles: visibleProfilesFor(session) });
