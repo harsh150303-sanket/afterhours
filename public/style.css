@@ -36,3 +36,13 @@
   #chat-app .composer .send-btn{flex:0 0 40px;width:40px;height:40px}
   .shell:has(#chat-app:not(.hidden)) .footer{display:none}
 }
+
+/* Restore vertical page scrolling on small screens; keep the composer accessible. */
+@media(max-width:800px){
+  html,body{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}
+  .shell{height:auto;min-height:100dvh;display:flex;flex-direction:column;overflow:visible}
+  #chat-app.chat-layout{height:auto;min-height:calc(100dvh - 100px);max-height:none;overflow:visible;grid-template-rows:auto minmax(55dvh,1fr)}
+  #chat-app .conversation{height:auto;min-height:55dvh;max-height:none;overflow:hidden}
+  #chat-app .messages{min-height:35dvh;max-height:55dvh;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+  #chat-app .composer{position:sticky;bottom:0;z-index:5}
+}
