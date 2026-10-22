@@ -46,3 +46,8 @@
   #chat-app .messages{min-height:35dvh;max-height:55dvh;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch}
   #chat-app .composer{position:sticky;bottom:0;z-index:5}
 }
+
+.chat-actions{display:flex;align-items:center;gap:6px}
+.host-control-btn{border:1px solid #57456b;border-radius:9px;padding:8px 10px;background:#30253d;color:#e7d5ff;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer}
+.host-control-btn:active{transform:scale(.98)}
+@media(max-width:800px){#chat-app .host-control-btn{font-size:10px;padding:7px 8px}}
