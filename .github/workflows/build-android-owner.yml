@@ -28,7 +28,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-35,build-tools;35.0.0'
+          packages: |
+            platforms;android-35
+            build-tools;35.0.0
       - name: Build debug APK
         working-directory: android-owner
         run: |
