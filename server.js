@@ -9,7 +9,7 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 1e5 });
+const io = new Server(server, { maxHttpBufferSize: 1_200_000 });
 
 const PORT = Number(process.env.PORT || 3000);
 const INVITE_CODE = process.env.INVITE_CODE || "";
@@ -2002,15 +2002,17 @@ io.on("connection", socket => {
     socket.emit("joined-profile", publicProfile(profile));
   });
 
-  socket.on("send-message", ({ profileId, text } = {}) => {
+  socket.on("send-message", ({ profileId, text, image } = {}) => {
     const body = typeof text === "string" ? text.trim() : "";
-    if (!body || body.length > 2000) return;
+    const safeImage = typeof image === "string" && image.length <= 900_000 &&
+      /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image) ? image : "";
+    if ((!body && !safeImage) || body.length > 2000) return;
     if (!session.activeProfile || profileId !== session.activeProfile) return;
     const profile = profiles.find(p => p.id === profileId);
     if (!profile) return;
     const message = {
       id: randomId(), from: "visitor", sender: session.name, sessionId: session.sid,
-      profileId, text: body, timestamp: Date.now()
+      profileId, text: body, ...(safeImage ? { image: safeImage } : {}), timestamp: Date.now()
     };
     if (!rooms.has(profileId)) rooms.set(profileId, []);
     rooms.get(profileId).push(message);
@@ -2034,14 +2036,16 @@ io.on("connection", socket => {
     socket.emit("owner-history", { profileId, messages: (rooms.get(profileId) || []).slice(-100) });
   });
 
-  socket.on("owner-reply", ({ profileId, text, personaName, token } = {}) => {
+  socket.on("owner-reply", ({ profileId, text, image, personaName, token } = {}) => {
     if (!safeEqual(token, OWNER_TOKEN)) return;
     const body = typeof text === "string" ? text.trim() : "";
+    const safeImage = typeof image === "string" && image.length <= 900_000 &&
+      /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image) ? image : "";
     const profile = profiles.find(p => p.id === profileId);
-    if (!profile || !body || body.length > 2000) return;
+    if (!profile || (!body && !safeImage) || body.length > 2000) return;
     const message = {
       id: randomId(), from: "persona", sender: profile.name,
-      profileId, text: body, timestamp: Date.now()
+      profileId, text: body, ...(safeImage ? { image: safeImage } : {}), timestamp: Date.now()
     };
     if (!rooms.has(profileId)) rooms.set(profileId, []);
     rooms.get(profileId).push(message);
