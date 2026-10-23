@@ -62,10 +62,10 @@ async function saveMessage(message) {
   const ready = await dbReady;
   if (!ready) throw new Error("Database is configured but not ready.");
   await db.query(
-    `INSERT INTO chat_messages (id, profile_id, session_id, sender_role, sender, message_text, image_data, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `INSERT INTO chat_messages (id, profile_id, session_id, sender_role, sender, message_text, image_data, media_type, view_once, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      ON CONFLICT (id) DO NOTHING`,
-    [message.id, message.profileId, message.sessionId || null, message.from, message.sender, message.text || "", message.image || null, message.timestamp]
+    [message.id, message.profileId, message.sessionId || null, message.from, message.sender, message.text || "", message.image || null, message.mediaType || null, message.viewOnce === true, message.timestamp]
   );
   return true;
 }
