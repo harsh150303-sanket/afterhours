@@ -57,24 +57,6 @@
       </section>
     </section>
 
-    <section id="owner-app" class="owner-layout hidden">
-      <div class="owner-header"><div><p class="eyebrow">HOST CONTROL</p><h1>Persona desk</h1><p>Manage fictional profiles and reply to conversations.</p></div><button id="back-to-chat" class="secondary-btn">Back to chat</button></div>
-      <div class="owner-grid">
-        <section class="panel owner-panel"><h2>Owner access</h2><label>Owner token<input id="owner-token" type="password" placeholder="Your OWNER_TOKEN"></label><button id="owner-connect" class="primary-btn">Connect owner console</button><p id="owner-status" class="error"></p><hr><h2>Create / update persona</h2>
-          <form id="persona-form">
-            <label>Profile ID<input id="persona-id" placeholder="e.g. alex" pattern="[A-Za-z0-9_-]{2,24}" required></label>
-            <label>Display name<input id="persona-name" maxlength="32" required></label>
-            <div class="two-col"><label>Age (18+)<input id="persona-age" type="number" min="18" value="28" required></label><label>Gender<select id="persona-gender"><option>Man</option><option>Woman</option><option>Non-binary</option></select></label></div><label>Accent colour<input id="persona-color" type="color" value="#d9b8ff"></label>
-            <label>Short bio<input id="persona-bio" maxlength="160" placeholder="A short fictional character description"></label>
-            <button class="primary-btn" type="submit">Save persona</button>
-          </form>
-          <div id="owner-profiles" class="owner-profiles"></div>
-        </section>
-        <section class="panel owner-panel"><h2>Inbox</h2><p class="muted">Choose a profile to review its recent messages and reply as that roleplay character.</p><label>Conversation<select id="owner-room"><option value="">Choose a persona…</option></select></label><div id="owner-messages" class="owner-messages"><p class="muted">Connect, then choose a conversation.</p></div>
-          <form id="owner-reply-form" class="owner-reply"><label class="image-pick" title="Attach a photo or video" aria-label="Attach a photo or video">＋<input id="owner-image" type="file" accept="image/*,video/mp4,video/webm,video/quicktime" disabled></label><label class="check-row view-once-option"><input id="owner-view-once" type="checkbox" disabled><span>View once</span></label><input id="owner-reply-input" maxlength="2000" placeholder="Reply as selected persona…" disabled><button class="send-btn" type="submit" disabled>➤</button></form>
-        </section>
-      </div>
-    </section>
     <footer class="footer"><span>AfterHours · private roleplay</span><a href="/privacy.html">Privacy</a><span>18+ only</span></footer>
   </main>
   <script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
