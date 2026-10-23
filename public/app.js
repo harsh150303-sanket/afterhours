@@ -85,7 +85,20 @@ socket.on("connect_error", err => {
   $("entry-error").textContent = message;
 
 });
-socket.on("profiles", list => { profiles = list; renderProfiles(); });
+socket.on("profiles", list => {
+  const priorActive = activeProfile;
+  profiles = list;
+  renderProfiles();
+  if (priorActive && profiles.some(p => p.id === priorActive)) {
+    activeProfile = priorActive;
+    renderProfiles();
+    const p = profileById(priorActive);
+    if (p) {
+      const head = $("conversation-head");
+      head.innerHTML = `<div class="avatar" style="background:${esc(p.color)};color:#2a2034">✦</div><div><h2>${esc(p.name)}, ${p.age}</h2><p>${esc(p.bio || "Ready to chat")}</p></div>`;
+    }
+  }
+});
 socket.on("history", list => { $("messages").innerHTML = ""; list.forEach(addMessage); if (!list.length) $("messages").innerHTML = '<div class="empty-state"><div class="empty-symbol">✧</div><h3>Say hello.</h3><p>Your messages will appear here.</p></div>'; });
 socket.on("joined-profile", p => {
   $("conversation-head").innerHTML = `<div class="avatar" style="background:${esc(p.color)};color:#2a2034">✦</div><div><h2>${esc(p.name)}, ${p.age}</h2><p>${esc(p.bio || "Ready to chat")}</p></div>`;
