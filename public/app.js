@@ -98,10 +98,7 @@ $("entry-form").addEventListener("submit", async e => {
 function renderProfiles() {
   $("profile-list").innerHTML = profiles.map(p => `<button class="profile-card ${activeProfile===p.id?"active":""}" data-profile="${esc(p.id)}"><span class="avatar" style="--profile-color:${esc(p.color)}">✦</span><span class="profile-info"><strong>${esc(p.name)}, ${p.age}</strong><span>${esc(p.bio || "Ready to chat")}</span></span></button>`).join("");
   document.querySelectorAll("[data-profile]").forEach(el => el.addEventListener("click", () => joinProfile(el.dataset.profile)));
-  const roomSelect = $("owner-room");
-  const selected = roomSelect.value;
-  roomSelect.innerHTML = '<option value="">Choose a persona…</option>' + profiles.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
-  roomSelect.value = selected;
+
 }
 function joinProfile(id) {
   activeProfile = id; renderProfiles();
@@ -115,14 +112,14 @@ function addMessage(m) {
   const mine = m.from === "visitor";
   const div = document.createElement("div");
   div.className = "message" + (mine ? " mine" : "");
-  const imageHtml = typeof m.image === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(m.image) ? `<img class="chat-image" src="${m.image}" alt="Image shared in chat" loading="lazy">` : "";
+  const imageHtml = typeof m.image === "string" ? (m.mediaType === "video" ? `<video class="chat-image" controls playsinline preload="metadata" src="${m.image}"></video>` : `<img class="chat-image" src="${m.image}" alt="Photo shared in chat" loading="lazy">`) : "";
   div.innerHTML = `<span class="message-meta">${esc(m.sender)} · ${time(m.timestamp)}</span>${imageHtml}${m.text ? `<div class="bubble">${esc(m.text)}</div>` : ""}`;
   $("messages").appendChild(div); $("messages").scrollTop = $("messages").scrollHeight;
 }
 function renderOwnerMessages() {
   const arr = ownerMessages.get(ownerRoom) || [];
   $("owner-messages").innerHTML = arr.length ? arr.map(m => {
-    const imageHtml = typeof m.image === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(m.image) ? `<img class="chat-image" src="${m.image}" alt="Image shared in chat" loading="lazy">` : "";
+    const imageHtml = typeof m.image === "string" ? (m.mediaType === "video" ? `<video class="chat-image" controls playsinline src="${m.image}"></video>` : `<img class="chat-image" src="${m.image}" alt="Photo shared in chat" loading="lazy">`) : "";
     return `<div class="owner-message"><strong>${esc(m.sender)} · ${time(m.timestamp)}</strong>${imageHtml}${m.text ? `<div>${esc(m.text)}</div>` : ""}</div>`;
   }).join("") : '<p class="muted">No messages in this conversation yet.</p>';
   $("owner-messages").scrollTop = $("owner-messages").scrollHeight;
@@ -173,13 +170,18 @@ socket.on("profiles-updated", list => { profiles = list; renderProfiles(); rende
 socket.on("history", list => { $("messages").innerHTML = ""; list.forEach(addMessage); if (!list.length) $("messages").innerHTML = '<div class="empty-state"><div class="empty-symbol">✧</div><h3>Say hello.</h3><p>Your messages will appear here.</p></div>'; });
 socket.on("joined-profile", p => {
   $("conversation-head").innerHTML = `<div class="avatar" style="background:${esc(p.color)};color:#2a2034">✦</div><div><h2>${esc(p.name)}, ${p.age}</h2><p>${esc(p.bio || "Ready to chat")}</p></div>`;
-  $("message-input").disabled = false; $("visitor-image").disabled = false; document.querySelector("#message-form button[type=submit]").disabled = false;
+  $("message-input").disabled = false; $("visitor-image").disabled = false; $("visitor-view-once").disabled = false; document.querySelector("#message-form button[type=submit]").disabled = false;
 });
 socket.on("message", addMessage);
 socket.on("chat-error", msg => alert(msg));
 async function prepareImage(file) {
   if (!file) return "";
-  if (!file.type.startsWith("image/")) throw new Error("Choose an image file.");
+  if (file.type.startsWith("video/")) {
+    if (!["video/mp4","video/webm","video/quicktime"].includes(file.type)) throw new Error("Use MP4, WebM, or QuickTime video.");
+    if (file.size > 6 * 1024 * 1024) throw new Error("Choose a video smaller than 6 MB.");
+    return await new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error("Could not read this video.")); reader.readAsDataURL(file); });
+  }
+  if (!file.type.startsWith("image/")) throw new Error("Choose a photo or supported video file.");
   if (file.size > 12 * 1024 * 1024) throw new Error("Choose an image smaller than 12 MB.");
   const source = await new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -206,7 +208,7 @@ $("message-form").addEventListener("submit", async e => {
   button.disabled = true;
   try {
     const image = file ? await prepareImage(file) : "";
-    socket.emit("send-message", {profileId:activeProfile,text,image});
+    socket.emit("send-message", {profileId:activeProfile,text,image,mediaType:file && file.type.startsWith("video/") ? "video" : "image",viewOnce:!!file && $("visitor-view-once").checked});
     $("message-input").value = "";
     $("visitor-image").value = "";
   } catch (err) { alert(err.message || "Could not send image."); }
@@ -230,10 +232,7 @@ $("leave").addEventListener("click", async () => {
   activeProfile=null; $("message-input").disabled=true; show("entry");
 });
 function openHostControl() { show("owner-app"); }
-$("open-host-control").addEventListener("click", openHostControl);
-document.querySelector(".footer a").addEventListener("click", e => {
-  e.preventDefault(); openHostControl();
-});
+if (new URLSearchParams(location.search).get("owner") === "1") show("owner-app");
 $("back-to-chat").addEventListener("click", () => show("chat-app"));
 function sendOwnerAuth() {
   if (!ownerAuthPending || !socket.connected) return;
@@ -285,7 +284,7 @@ $("owner-room").addEventListener("change", () => {
   ownerSessionId = cv ? cv.sessionId : "";
   const enabled = !!(ownerConnected && p && ownerSessionId);
   $("owner-reply-input").disabled = !enabled;
-  $("owner-image").disabled = !enabled;
+  $("owner-image").disabled = !enabled; $("owner-view-once").disabled = !enabled;
   $("owner-reply-form").querySelector("button").disabled = !enabled;
   if (enabled) {
     socket.emit("owner-join-profile", {profileId:cv.profileId,sessionId:ownerSessionId,token:ownerToken});
@@ -319,7 +318,7 @@ $("owner-reply-form").addEventListener("submit", async e => {
   button.disabled = true;
   try {
     const image = file ? await prepareImage(file) : "";
-    socket.emit("owner-reply", {profileId:ownerConversations.get(ownerRoom)?.profileId,sessionId:ownerSessionId,text,image,token:ownerToken});
+    socket.emit("owner-reply", {profileId:ownerConversations.get(ownerRoom)?.profileId,sessionId:ownerSessionId,text,image,mediaType:file && file.type.startsWith("video/") ? "video" : "image",viewOnce:!!file && $("owner-view-once").checked,token:ownerToken});
     $("owner-reply-input").value = "";
     $("owner-image").value = "";
   } catch (err) { alert(err.message || "Could not send image."); }
