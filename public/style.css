@@ -47,6 +47,7 @@
   #chat-app .composer{position:sticky;bottom:0;z-index:5}
 }
 
+.view-once-option{display:flex!important;align-items:center;gap:4px;margin:0!important;white-space:nowrap;font-size:10px!important}.view-once-open{border:1px solid #8062a2;background:#30243e;color:#f0ddff;border-radius:10px;padding:12px 16px;cursor:pointer}.view-once-open:disabled{opacity:.5}
 .chat-actions{display:flex;align-items:center;gap:6px}
 .host-control-btn{border:1px solid #57456b;border-radius:9px;padding:8px 10px;background:#30253d;color:#e7d5ff;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer}
 .host-control-btn:active{transform:scale(.98)}
