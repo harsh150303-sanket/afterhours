@@ -19,7 +19,7 @@
         <p class="eyebrow">A PRIVATE SPACE FOR ADULTS</p>
         <h1>Good conversations<br><em>happen after hours.</em></h1>
         <p class="intro-copy">A quiet, invite-only place for one-to-one conversations and consensual roleplay.</p>
-        <div class="disclosure"><span>ⓘ</span><p><strong>How this space works</strong><br>This is a host-operated roleplay experience. Profiles may be fictional characters managed by one host, not independent people. Continue only if you are comfortable with that.</p></div>
+        <div class="disclosure"><span>ⓘ</span><p><strong>Privacy and roleplay</strong><br>Some profiles may be fictional or roleplayed. Messages and media are processed and stored by AfterHours, and the service operator may access stored chats and media. View-once media is removed from normal chat storage after opening, but this is not a guarantee against copies, screenshots, or screen recording.</p></div>
       </div>
       <form id="entry-form" class="panel entry-form">
         <div class="panel-heading"><h2>Step inside</h2><p>No account needed. Use a nickname.</p></div>
@@ -30,7 +30,7 @@
           <label>Gender<select id="gender"><option>Woman</option><option>Man</option><option>Non-binary</option><option>Prefer not to say</option></select></label>
         </div>
         <label>Interested in chatting with<select id="preference"><option>Men</option><option>Women</option><option>Everyone</option></select></label>
-        <label class="check-row"><input id="consent" type="checkbox" required><span>I am 18 or older, and I understand that profiles may be operated by one host for roleplay.</span></label>
+        <label class="check-row"><input id="consent" type="checkbox" required><span>I am 18 or older, understand that some profiles may be roleplayed, and accept the privacy notice about operator access to stored chats and media.</span></label>
         <button class="primary-btn" type="submit">Enter private chat <span>↗</span></button>
         <p id="entry-error" class="error" role="alert"></p>
         <p class="tiny-note">Don't use your legal name or share sensitive personal information.</p>
@@ -39,7 +39,7 @@
 
     <section id="chat-app" class="chat-layout hidden">
       <aside class="sidebar panel">
-        <div class="side-heading"><div><p class="eyebrow">YOUR SPACE</p><h2>Conversations</h2></div><div class="chat-actions"><button id="open-host-control" class="host-control-btn" type="button">Host control</button><button id="leave" class="icon-btn" title="Leave chat">↪</button></div></div>
+        <div class="side-heading"><div><p class="eyebrow">YOUR SPACE</p><h2>Conversations</h2></div><button id="leave" class="icon-btn" title="Leave chat">↪</button></div>
         <div id="profile-list" class="profile-list"></div>
         <div class="side-footer"><span class="status-dot"></span><span>Private session</span></div>
       </aside>
@@ -50,7 +50,7 @@
         </header>
         <div id="messages" class="messages"><div class="empty-state"><div class="empty-symbol">✧</div><h3>Your next conversation starts here.</h3><p>Choose a profile on the left to begin.</p></div></div>
         <form id="message-form" class="composer">
-          <label class="image-pick" title="Attach an image" aria-label="Attach an image">＋<input id="visitor-image" type="file" accept="image/*" disabled></label>
+          <label class="image-pick" title="Attach a photo or video" aria-label="Attach a photo or video">＋<input id="visitor-image" type="file" accept="image/*,video/mp4,video/webm,video/quicktime" disabled></label><label class="check-row view-once-option"><input id="visitor-view-once" type="checkbox" disabled><span>View once</span></label>
           <input id="message-input" maxlength="2000" placeholder="Write a message…" autocomplete="off" disabled>
           <button class="send-btn" type="submit" disabled aria-label="Send message">➤</button>
         </form>
@@ -71,11 +71,11 @@
           <div id="owner-profiles" class="owner-profiles"></div>
         </section>
         <section class="panel owner-panel"><h2>Inbox</h2><p class="muted">Choose a profile to review its recent messages and reply as that roleplay character.</p><label>Conversation<select id="owner-room"><option value="">Choose a persona…</option></select></label><div id="owner-messages" class="owner-messages"><p class="muted">Connect, then choose a conversation.</p></div>
-          <form id="owner-reply-form" class="owner-reply"><label class="image-pick" title="Attach an image" aria-label="Attach an image">＋<input id="owner-image" type="file" accept="image/*" disabled></label><input id="owner-reply-input" maxlength="2000" placeholder="Reply as selected persona…" disabled><button class="send-btn" type="submit" disabled>➤</button></form>
+          <form id="owner-reply-form" class="owner-reply"><label class="image-pick" title="Attach a photo or video" aria-label="Attach a photo or video">＋<input id="owner-image" type="file" accept="image/*,video/mp4,video/webm,video/quicktime" disabled></label><label class="check-row view-once-option"><input id="owner-view-once" type="checkbox" disabled><span>View once</span></label><input id="owner-reply-input" maxlength="2000" placeholder="Reply as selected persona…" disabled><button class="send-btn" type="submit" disabled>➤</button></form>
         </section>
       </div>
     </section>
-    <footer class="footer"><span>AfterHours · private roleplay</span><a href="/owner.html">Host console</a><span>18+ only</span></footer>
+    <footer class="footer"><span>AfterHours · private roleplay</span><a href="/privacy.html">Privacy</a><span>18+ only</span></footer>
   </main>
   <script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
 </body>
