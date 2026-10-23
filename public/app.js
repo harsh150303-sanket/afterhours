@@ -150,16 +150,4 @@ $("leave").addEventListener("click", async () => {
   await fetch("/api/leave",{method:"POST"});
   activeProfile=null; $("message-input").disabled=true; show("entry");
 });
-function openHostControl() { show("owner-app"); }
-if (new URLSearchParams(location.search).get("owner") === "1") show("owner-app");
-$("back-to-chat").addEventListener("click", () => show("chat-app"));
-function sendOwnerAuth() {
-  if (!ownerAuthPending || !socket.connected) return;
-  ownerAuthPending = false;
-  socket.emit("owner-auth", {token:ownerToken});
-  if (ownerAuthTimer) clearTimeout(ownerAuthTimer);
-  ownerAuthTimer = setTimeout(() => {
-    if (!ownerConnected) $("owner-status").textContent = "No response from the server. Refresh the page and check the Render logs.";
-  }, 8000);
-}
 restoreVisitorSession();
