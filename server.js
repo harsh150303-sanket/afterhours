@@ -10,7 +10,7 @@ const { Pool } = require("pg");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 1_200_000 });
+const io = new Server(server, { maxHttpBufferSize: 10_000_000 });
 
 const PORT = Number(process.env.PORT || 3000);
 const INVITE_CODE = process.env.INVITE_CODE || "";
@@ -38,8 +38,12 @@ if (db) {
       sender TEXT NOT NULL,
       message_text TEXT NOT NULL DEFAULT '',
       image_data TEXT,
+      media_type TEXT,
+      view_once BOOLEAN NOT NULL DEFAULT FALSE,
       created_at BIGINT NOT NULL
     );
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS media_type TEXT;
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS view_once BOOLEAN NOT NULL DEFAULT FALSE;
     CREATE INDEX IF NOT EXISTS chat_messages_profile_created_idx
       ON chat_messages (profile_id, created_at);
   `).then(() => {
