@@ -3,14 +3,7 @@ const socket = io({ autoConnect: false });
 let myName = "";
 let profiles = [];
 let activeProfile = null;
-let ownerToken = "";
-let ownerConnected = false;
-let ownerRoom = "";
-let ownerSessionId = "";
-let ownerMessages = new Map();
-let ownerConversations = new Map();
-let ownerAuthPending = false;
-let ownerAuthTimer = null;
+
 const notifiedChats = new Set();
 
 function show(id) { ["entry","chat-app","owner-app"].forEach(x => $(x).classList.toggle("hidden", x !== id)); }
@@ -116,14 +109,7 @@ function addMessage(m) {
   div.innerHTML = `<span class="message-meta">${esc(m.sender)} · ${time(m.timestamp)}</span>${imageHtml}${m.text ? `<div class="bubble">${esc(m.text)}</div>` : ""}`;
   $("messages").appendChild(div); $("messages").scrollTop = $("messages").scrollHeight;
 }
-function renderOwnerMessages() {
-  const arr = ownerMessages.get(ownerRoom) || [];
-  $("owner-messages").innerHTML = arr.length ? arr.map(m => {
-    const imageHtml = typeof m.image === "string" ? (m.mediaType === "video" ? `<video class="chat-image" controls playsinline src="${m.image}"></video>` : `<img class="chat-image" src="${m.image}" alt="Photo shared in chat" loading="lazy">`) : "";
-    return `<div class="owner-message"><strong>${esc(m.sender)} · ${time(m.timestamp)}</strong>${imageHtml}${m.text ? `<div>${esc(m.text)}</div>` : ""}</div>`;
-  }).join("") : '<p class="muted">No messages in this conversation yet.</p>';
-  $("owner-messages").scrollTop = $("owner-messages").scrollHeight;
-}
+function renderOwnerMessages() { return; }
 function conversationKey(sessionId, profileId) { return String(sessionId || "") + "|" + profileId; }
 function renderOwnerConversationOptions() {
   const select = $("owner-room"), selected = select.value;
@@ -144,16 +130,6 @@ function storeOwnerMessage(m) {
   if (!arr.some(x => x.id === m.id)) arr.push(m);
   renderOwnerConversationOptions();
   if (ownerRoom === key) renderOwnerMessages();
-}
-function renderOwnerProfiles() {
-  $("owner-profiles").innerHTML = profiles.map(p => `<div class="owner-profile-row"><span><strong>${esc(p.name)}</strong> · ${p.age}<br><span class="muted">${esc(p.id)}</span></span><button data-delete-profile="${esc(p.id)}">Delete</button></div>`).join("");
-  document.querySelectorAll("[data-delete-profile]").forEach(btn => btn.addEventListener("click", async () => {
-    if (!confirm("Delete this fictional persona?")) return;
-    const r = await fetch("/api/owner/profiles/"+encodeURIComponent(btn.dataset.deleteProfile), {method:"DELETE",headers:{"x-owner-token":ownerToken}});
-    const d = await r.json(); if (!r.ok) return alert(d.error || "Delete failed.");
-    profiles = d.profiles || profiles.filter(p=>p.id!==btn.dataset.deleteProfile);
-    renderProfiles(); renderOwnerProfiles();
-  }));
 }
 socket.on("connect_error", err => {
   const message = err.message || "Connection failed.";
@@ -243,98 +219,4 @@ function sendOwnerAuth() {
     if (!ownerConnected) $("owner-status").textContent = "No response from the server. Refresh the page and check the Render logs.";
   }, 8000);
 }
-$("owner-connect").addEventListener("click", () => {
-  ownerToken = $("owner-token").value;
-  if (!ownerToken) { $("owner-status").textContent = "Enter the owner token."; return; }
-  if ("Notification" in window && Notification.permission === "default") {
-    Notification.requestPermission().catch(() => {});
-  }
-  ownerConnected = false;
-  ownerAuthPending = true;
-  $("owner-status").textContent = "Connecting to server…";
-  if (!socket.connected) {
-    socket.connect();
-    if (ownerAuthTimer) clearTimeout(ownerAuthTimer);
-    ownerAuthTimer = setTimeout(() => {
-      if (ownerAuthPending) {
-        ownerAuthPending = false;
-        $("owner-status").textContent = "Chat server is not connected. Refresh and try again.";
-      }
-    }, 8000);
-  } else {
-    sendOwnerAuth();
-  }
-});
-socket.on("connect", sendOwnerAuth);
-socket.on("disconnect", () => {
-  if (ownerConnected) $("owner-status").textContent = "Disconnected. Reconnect to receive chat notifications.";
-  ownerConnected = false;
-});
-socket.on("owner-auth-result", result => {
-  if (ownerAuthTimer) clearTimeout(ownerAuthTimer);
-  ownerConnected = result.ok;
-  $("owner-status").textContent = result.ok
-    ? ("Owner console connected." + (("Notification" in window && Notification.permission === "granted") ? " Chat notifications are enabled." : " Allow browser notifications to receive alerts."))
-    : "Owner token was rejected. Check OWNER_TOKEN in Render.";
-  if (result.ok) { profiles = result.profiles; renderOwnerProfiles(); renderProfiles(); ownerConversations.clear(); ownerMessages.clear(); $("owner-room").innerHTML = '<option value="">Waiting for visitor messages…</option>'; }
-});
-$("owner-room").addEventListener("change", () => {
-  ownerRoom = $("owner-room").value;
-  const cv = ownerConversations.get(ownerRoom), p = cv ? profileById(cv.profileId) : null;
-  ownerSessionId = cv ? cv.sessionId : "";
-  const enabled = !!(ownerConnected && p && ownerSessionId);
-  $("owner-reply-input").disabled = !enabled;
-  $("owner-image").disabled = !enabled; $("owner-view-once").disabled = !enabled;
-  $("owner-reply-form").querySelector("button").disabled = !enabled;
-  if (enabled) {
-    socket.emit("owner-join-profile", {profileId:cv.profileId,sessionId:ownerSessionId,token:ownerToken});
-    renderOwnerMessages();
-  } else $("owner-messages").innerHTML = '<p class="muted">Choose a visitor conversation.</p>';
-});
-socket.on("owner-history", ({profileId,sessionId,messages}) => {
-  const key = conversationKey(sessionId,profileId);
-  ownerMessages.set(key,messages || []);
-  if (messages && messages.length) {
-    const v = [...messages].reverse().find(m => m.from === "visitor");
-    ownerConversations.set(key,{sessionId,profileId,sender:v ? v.sender : "Visitor",timestamp:messages[messages.length-1].timestamp});
-    renderOwnerConversationOptions();
-  }
-  if(ownerRoom===key) renderOwnerMessages();
-});
-socket.on("owner-inbox", storeOwnerMessage);
-socket.on("owner-conversations", list => {
-  for (const c of (Array.isArray(list) ? list : [])) {
-    const key = conversationKey(c.sessionId,c.profileId);
-    ownerConversations.set(key,c);
-  }
-  renderOwnerConversationOptions();
-});
-$("owner-reply-form").addEventListener("submit", async e => {
-  e.preventDefault();
-  const text = $("owner-reply-input").value.trim();
-  const file = $("owner-image").files[0];
-  if ((!text && !file) || !ownerRoom || !ownerConnected) return;
-  const button = $("owner-reply-form").querySelector("button[type=submit]");
-  button.disabled = true;
-  try {
-    const image = file ? await prepareImage(file) : "";
-    socket.emit("owner-reply", {profileId:ownerConversations.get(ownerRoom)?.profileId,sessionId:ownerSessionId,text,image,mediaType:file && file.type.startsWith("video/") ? "video" : "image",viewOnce:!!file && $("owner-view-once").checked,token:ownerToken});
-    $("owner-reply-input").value = "";
-    $("owner-image").value = "";
-  } catch (err) { alert(err.message || "Could not send image."); }
-  finally { button.disabled = !ownerConnected || !ownerRoom || !ownerSessionId; }
-});
-$("persona-form").addEventListener("submit", async e => {
-  e.preventDefault();
-  if (!ownerConnected) return $("owner-status").textContent = "Connect the owner console first.";
-  const body = {id:$("persona-id").value.trim().toLowerCase(),name:$("persona-name").value.trim(),age:Number($("persona-age").value),bio:$("persona-bio").value.trim(),color:$("persona-color").value};
-  const r = await fetch("/api/owner/profiles",{method:"POST",headers:{"Content-Type":"application/json","x-owner-token":ownerToken},body:JSON.stringify(body)});
-  const d = await r.json(); if(!r.ok) return $("owner-status").textContent = d.error || "Could not save persona.";
-  profiles = d.profiles; renderProfiles(); renderOwnerProfiles(); $("persona-form").reset(); $("persona-age").value=28; $("persona-color").value="#d9b8ff";
-});
-
-
-restoreVisitorSession();
-
-
 restoreVisitorSession();
