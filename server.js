@@ -70,13 +70,13 @@ async function saveMessage(message) {
   return true;
 }
 
-async function loadMessages(profileId, limit = 100, sessionId = null) {
+async function loadMessages(profileId, limit = 100, sessionId = null, includeViewOnceMedia = false) {
   if (!db) return null;
   const ready = await dbReady;
   if (!ready) throw new Error("Database is configured but not ready.");
   const result = sessionId
     ? await db.query(
-        `SELECT id, profile_id, session_id, sender_role, sender, message_text, image_data, created_at
+        `SELECT id, profile_id, session_id, sender_role, sender, message_text, image_data, media_type, view_once, created_at
          FROM chat_messages WHERE profile_id = $1 AND session_id = $2 ORDER BY created_at DESC LIMIT $3`,
         [profileId, sessionId, limit]
       )
@@ -88,7 +88,9 @@ async function loadMessages(profileId, limit = 100, sessionId = null) {
   return result.rows.reverse().map(row => ({
     id: row.id, profileId: row.profile_id, sessionId: row.session_id,
     from: row.sender_role, sender: row.sender, text: row.message_text,
-    ...(row.image_data ? { image: row.image_data } : {}),
+    ...(row.image_data && (!row.view_once || includeViewOnceMedia) ? { image: row.image_data } : {}),
+    ...(row.media_type ? { mediaType: row.media_type } : {}),
+    ...(row.view_once ? { viewOnce: true, mediaAvailable: Boolean(row.image_data) } : {}),
     timestamp: Number(row.created_at)
   }));
 }
@@ -2108,17 +2110,17 @@ io.on("connection", socket => {
     socket.emit("joined-profile", publicProfile(profile));
   });
 
-  socket.on("send-message", async ({ profileId, text, image } = {}) => {
+  socket.on("send-message", async ({ profileId, text, image, mediaType, viewOnce } = {}) => {
     const body = typeof text === "string" ? text.trim() : "";
-    const safeImage = typeof image === "string" && image.length <= 900_000 &&
-      /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image) ? image : "";
+    const safeImage = typeof image === "string" && image.length <= 8_500_000 &&
+      /^data:(image\/(jpeg|png|webp)|video\/(mp4|webm|quicktime));base64,[A-Za-z0-9+/]+=*$/.test(image) ? image : "";
     if ((!body && !safeImage) || body.length > 2000) return;
     if (!session.activeProfile || profileId !== session.activeProfile) return;
     const profile = profiles.find(p => p.id === profileId);
     if (!profile) return;
     const message = {
       id: randomId(), from: "visitor", sender: session.name, sessionId: session.sid,
-      profileId, text: body, ...(safeImage ? { image: safeImage } : {}), timestamp: Date.now()
+      profileId, text: body, ...(safeImage ? { image: safeImage, mediaType: mediaType === "video" ? "video" : "image", viewOnce: viewOnce === true } : {}), timestamp: Date.now()
     };
     try {
       await saveMessage(message);
@@ -2163,7 +2165,7 @@ io.on("connection", socket => {
     socket.data.ownerRoom = { profileId, sessionId };
     try {
       const room = "chat:" + sessionId + ":" + profileId;
-      const history = db ? await loadMessages(profileId, 100, sessionId) : (rooms.get(room) || []);
+      const history = db ? await loadMessages(profileId, 100, sessionId, true) : (rooms.get(room) || []);
       socket.emit("owner-history", { profileId, sessionId, messages: (history || []).slice(-100) });
     } catch (err) {
       console.error("Could not load owner chat history:", err.message);
@@ -2171,7 +2173,7 @@ io.on("connection", socket => {
     }
   });
 
-  socket.on("owner-reply", async ({ profileId, sessionId, text, image, personaName, token } = {}) => {
+  socket.on("owner-reply", async ({ profileId, sessionId, text, image, mediaType, viewOnce, personaName, token } = {}) => {
     if (!safeEqual(token, OWNER_TOKEN)) return;
     if (typeof sessionId !== "string" || !sessionId) return;
     if (socket.data.ownerRoom?.profileId !== profileId || socket.data.ownerRoom?.sessionId !== sessionId) return;
