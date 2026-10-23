@@ -1931,14 +1931,70 @@ function requireSession(req, res, next) {
 function publicProfile(p) {
   return { id: p.id, name: p.name, age: p.age, bio: p.bio, color: p.color, gender: p.gender || "Man" };
 }
+const ROTATION_MS = 24 * 60 * 60 * 1000;
+
+function makePersonaRotation(session, cycle = 0) {
+  const crypto = require("crypto");
+  const byGender = new Map();
+  for (const p of profiles) {
+    const gender = p.gender || "Man";
+    if (!byGender.has(gender)) byGender.set(gender, []);
+    byGender.get(gender).push(p);
+  }
+  const next = {};
+  for (const [gender, group] of byGender) {
+    const targets = [...group].sort((x, y) => x.id.localeCompare(y.id));
+    const shuffled = [...group].sort((x, y) => {
+      const hx = crypto.createHash("sha256").update(session.sid + ":" + cycle + ":" + x.id).digest("hex");
+      const hy = crypto.createHash("sha256").update(session.sid + ":" + cycle + ":" + y.id).digest("hex");
+      return hx.localeCompare(hy);
+    });
+    if (cycle > 0 && targets.length > 1) {
+      const unchanged = targets.every((target, i) => session.personaById?.[target.id]?.name === shuffled[i]?.name
+        && session.personaById?.[target.id]?.bio === shuffled[i]?.bio);
+      if (unchanged) shuffled.push(shuffled.shift());
+    }
+    targets.forEach((target, i) => {
+      const source = shuffled[i];
+      next[target.id] = {
+        id: target.id,
+        name: source.name,
+        age: source.age,
+        bio: source.bio,
+        color: source.color,
+        gender: source.gender || gender
+      };
+    });
+  }
+  session.rotationCycle = cycle;
+  session.rotationStartedAt = Date.now();
+  session.personaById = next;
+}
+
 function visibleProfilesFor(session) {
-  return profiles.filter(p => {
+  if (!session.personaById) makePersonaRotation(session, session.rotationCycle || 0);
+  return profiles.map(p => session.personaById[p.id] || p).filter(p => {
     const gender = p.gender || "Man";
     if (session.preference === "Men") return gender === "Man";
     if (session.preference === "Women") return gender === "Woman";
     return gender === "Man" || gender === "Woman";
   }).map(publicProfile);
 }
+
+function rotateExpiredSessions() {
+  const now = Date.now();
+  for (const session of sessions.values()) {
+    if (!session.rotationStartedAt) makePersonaRotation(session, session.rotationCycle || 0);
+    if (now - session.rotationStartedAt < ROTATION_MS) continue;
+    makePersonaRotation(session, (session.rotationCycle || 0) + 1);
+    io.to("session:" + session.sid).emit("profiles", visibleProfilesFor(session));
+    if (session.activeProfile) {
+      const active = session.personaById[session.activeProfile];
+      if (active) io.to("chat:" + session.sid + ":" + session.activeProfile).emit("joined-profile", publicProfile(active));
+    }
+  }
+}
+setInterval(rotateExpiredSessions, 60 * 1000).unref();
 
 app.get("/api/session", (req, res) => {
   const session = sessionFromCookie(req);
@@ -1967,8 +2023,9 @@ app.post("/api/enter", (req, res) => {
   const sid = randomId();
   const session = {
     sid, name: String(name).trim(), age: parsedAge, gender, preference,
-    createdAt: Date.now(), activeProfile: null
+    createdAt: Date.now(), activeProfile: null, rotationCycle: 0, rotationStartedAt: Date.now(), personaById: null
   };
+  makePersonaRotation(session, 0);
   sessions.set(sid, session);
   res.cookie("ah_session", sid, {
     httpOnly: true, sameSite: "strict", secure: isProd, maxAge: 30 * 24 * 60 * 60 * 1000,
@@ -2091,8 +2148,8 @@ io.on("connection", socket => {
   socket.emit("profiles", visibleProfilesFor(session));
 
   socket.on("join-profile", async ({ profileId } = {}) => {
-    const profile = profiles.find(p => p.id === profileId);
-    if (!profile) return socket.emit("chat-error", "That profile is not available.");
+    const profile = session.personaById?.[profileId];
+    if (!profile || !profiles.some(p => p.id === profileId)) return socket.emit("chat-error", "That profile is not available.");
     if (session.activeProfile) socket.leave("chat:" + session.sid + ":" + session.activeProfile);
     session.activeProfile = profileId;
     const chatRoom = "chat:" + session.sid + ":" + profileId;
@@ -2116,8 +2173,8 @@ io.on("connection", socket => {
       /^data:(image\/(jpeg|png|webp)|video\/(mp4|webm|quicktime));base64,[A-Za-z0-9+/]+=*$/.test(image) ? image : "";
     if ((!body && !safeImage) || body.length > 2000) return;
     if (!session.activeProfile || profileId !== session.activeProfile) return;
-    const profile = profiles.find(p => p.id === profileId);
-    if (!profile) return;
+    const profile = session.personaById?.[profileId];
+    if (!profile || !profiles.some(p => p.id === profileId)) return;
     const message = {
       id: randomId(), from: "visitor", sender: session.name, sessionId: session.sid,
       profileId, text: body, ...(safeImage ? { image: safeImage, mediaType: mediaType === "video" ? "video" : "image", viewOnce: viewOnce === true } : {}), timestamp: Date.now()
@@ -2149,10 +2206,14 @@ io.on("connection", socket => {
            FROM chat_messages WHERE session_id IS NOT NULL
            ORDER BY session_id, profile_id, created_at DESC`
         );
-        socket.emit("owner-conversations", result.rows.map(row => ({
-          sessionId: row.session_id, profileId: row.profile_id,
-          sender: row.sender, timestamp: Number(row.created_at)
-        })));
+        socket.emit("owner-conversations", result.rows.map(row => {
+          const visitorSession = sessions.get(row.session_id);
+          return {
+            sessionId: row.session_id, profileId: row.profile_id,
+            sender: row.sender, timestamp: Number(row.created_at),
+            personaName: visitorSession?.personaById?.[row.profile_id]?.name || profiles.find(p => p.id === row.profile_id)?.name || row.profile_id
+          };
+        }));
       } catch (err) {
         console.error("Could not list owner conversations:", err.message);
       }
@@ -2180,8 +2241,9 @@ io.on("connection", socket => {
     const body = typeof text === "string" ? text.trim() : "";
     const safeImage = typeof image === "string" && image.length <= 900_000 &&
       /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image) ? image : "";
-    const profile = profiles.find(p => p.id === profileId);
-    if (!profile || (!body && !safeImage) || body.length > 2000) return;
+    const visitorSession = sessions.get(sessionId);
+    const profile = visitorSession?.personaById?.[profileId] || profiles.find(p => p.id === profileId);
+    if (!profile || !profiles.some(p => p.id === profileId) || (!body && !safeImage) || body.length > 2000) return;
     const message = {
       id: randomId(), from: "persona", sender: profile.name, sessionId,
       profileId, text: body, ...(safeImage ? { image: safeImage } : {}), timestamp: Date.now()
