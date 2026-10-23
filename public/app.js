@@ -6,39 +6,10 @@ let activeProfile = null;
 
 const notifiedChats = new Set();
 
-function show(id) { ["entry","chat-app","owner-app"].forEach(x => $(x).classList.toggle("hidden", x !== id)); }
+function show(id) { ["entry","chat-app"].forEach(x => $(x).classList.toggle("hidden", x !== id)); }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function time(ts) { return new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); }
 function profileById(id) { return profiles.find(p => p.id === id); }
-
-function notifyOwnerOfVisitorMessage(m) {
-  if (!ownerConnected || !m || m.from !== "visitor") return;
-  const chatKey = String(m.sessionId || m.sender || "visitor") + ":" + m.profileId;
-  if (notifiedChats.has(chatKey)) return;
-  notifiedChats.add(chatKey);
-  const profile = profileById(m.profileId);
-  const title = "AfterHours · New message";
-  const body = (m.sender || "A visitor") + " messaged " + (profile ? profile.name : "a persona") + ".";
-  try {
-    if (window.AfterHoursNative && typeof window.AfterHoursNative.notify === "function") {
-      window.AfterHoursNative.notify(title, body, String(m.profileId));
-    }
-  } catch (_) {}
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
-  try {
-    const notice = new Notification(title, {
-      body,
-      tag: "afterhours-" + chatKey
-    });
-    notice.onclick = () => {
-      window.focus();
-      show("owner-app");
-      $("owner-room").value = m.profileId;
-      $("owner-room").dispatchEvent(new Event("change"));
-      notice.close();
-    };
-  } catch (_) {}
-}
 
 async function restoreVisitorSession() {
   try {
@@ -109,40 +80,12 @@ function addMessage(m) {
   div.innerHTML = `<span class="message-meta">${esc(m.sender)} · ${time(m.timestamp)}</span>${imageHtml}${m.text ? `<div class="bubble">${esc(m.text)}</div>` : ""}`;
   $("messages").appendChild(div); $("messages").scrollTop = $("messages").scrollHeight;
 }
-function renderOwnerMessages() { return; }
-function conversationKey(sessionId, profileId) { return String(sessionId || "") + "|" + profileId; }
-function renderOwnerConversationOptions() {
-  const select = $("owner-room"), selected = select.value;
-  const list = Array.from(ownerConversations.values()).sort((x,y) => (y.timestamp || 0) - (x.timestamp || 0));
-  select.innerHTML = '<option value="">Choose a visitor conversation…</option>' + list.map(c => {
-    const key = conversationKey(c.sessionId,c.profileId);
-    return '<option value="' + esc(key) + '">' + esc(c.sender || "Visitor") + ' — ' + esc((profileById(c.profileId) || {}).name || c.profileId) + '</option>';
-  }).join("");
-  if (list.some(c => conversationKey(c.sessionId,c.profileId) === selected)) select.value = selected;
-}
-function storeOwnerMessage(m) {
-  notifyOwnerOfVisitorMessage(m);
-  if (!m.sessionId) return;
-  const key = conversationKey(m.sessionId,m.profileId), old = ownerConversations.get(key) || {};
-  ownerConversations.set(key,{sessionId:m.sessionId,profileId:m.profileId,sender:m.from === "visitor" ? m.sender : (old.sender || "Visitor"),timestamp:m.timestamp});
-  if (!ownerMessages.has(key)) ownerMessages.set(key,[]);
-  const arr = ownerMessages.get(key);
-  if (!arr.some(x => x.id === m.id)) arr.push(m);
-  renderOwnerConversationOptions();
-  if (ownerRoom === key) renderOwnerMessages();
-}
 socket.on("connect_error", err => {
   const message = err.message || "Connection failed.";
   $("entry-error").textContent = message;
-  if (!$("owner-app").classList.contains("hidden")) {
-    ownerConnected = false;
-    ownerAuthPending = false;
-    if (ownerAuthTimer) clearTimeout(ownerAuthTimer);
-    $("owner-status").textContent = "Chat server connection failed: " + message;
-  }
+
 });
 socket.on("profiles", list => { profiles = list; renderProfiles(); });
-socket.on("profiles-updated", list => { profiles = list; renderProfiles(); renderOwnerProfiles(); });
 socket.on("history", list => { $("messages").innerHTML = ""; list.forEach(addMessage); if (!list.length) $("messages").innerHTML = '<div class="empty-state"><div class="empty-symbol">✧</div><h3>Say hello.</h3><p>Your messages will appear here.</p></div>'; });
 socket.on("joined-profile", p => {
   $("conversation-head").innerHTML = `<div class="avatar" style="background:${esc(p.color)};color:#2a2034">✦</div><div><h2>${esc(p.name)}, ${p.age}</h2><p>${esc(p.bio || "Ready to chat")}</p></div>`;
